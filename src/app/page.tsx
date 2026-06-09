@@ -1,210 +1,220 @@
 'use client'
-import { useState } from 'react'
-import Splash from '@/components/layout/Splash'
-import Navbar from '@/components/layout/Navbar'
-import Footer from '@/components/layout/Footer'
-import Hero from '@/components/sections/Hero'
-import ArtistsCarousel from '@/components/sections/ArtistsCarousel'
-import ContentFeed from '@/components/sections/ContentFeed'
-import StatsSection from '@/components/sections/StatsSection'
 import { motion } from 'framer-motion'
+import TopBar from '@/components/layout/TopBar'
+import BottomNav from '@/components/layout/BottomNav'
+import { useApp } from '@/lib/context'
+import { t } from '@/lib/i18n'
+import Image from 'next/image'
 
-type DemoMode = 'public' | 'user' | 'admin'
+const HF_IMGS = [
+  { src: '/hf/hero1.webp', label: 'Hero' },
+  { src: '/hf/community.webp', label: 'Comunidad' },
+  { src: '/hf/portfolio.webp', label: 'Portafolio' },
+  { src: '/hf/artist.webp', label: 'Artista' },
+  { src: '/hf/studio.webp', label: 'Estudio' },
+  { src: '/hf/collab.webp', label: 'Colaboración' },
+]
+
+const FEATURED = [
+  { title: 'Sombras del Pacífico', author: 'Sofía Reyes', type: 'Cortometraje', views: '45.2K', img: '/hf/hero1.webp', duration: '18 min' },
+  { title: 'Ecos del Norte', author: 'Marco Luna', type: 'Documental', views: '128K', img: '/hf/community.webp', duration: '6 ep', featured: true },
+  { title: 'La Ciudad que Duerme', author: 'Ana Flores', type: 'Película', views: '67.8K', img: '/hf/studio.webp', duration: '90 min' },
+]
+
+const ARTISTS = [
+  { name: 'Sofía R.', role: 'Directora', img: '/hf/artist.webp', verified: true },
+  { name: 'Marco L.', role: 'Músico', img: '/hf/cinematic.webp', verified: true },
+  { name: 'Ana F.', role: 'Fotógrafa', img: '/hf/collab.webp', verified: false },
+  { name: 'Luis V.', role: 'Actor', img: '/hf/portfolio.webp', verified: true },
+  { name: 'Valentina C.', role: 'Editora', img: '/hf/community.webp', verified: true },
+]
 
 export default function Home() {
-  const [demoMode, setDemoMode] = useState<DemoMode>('public')
+  const { lang, demoMode } = useApp()
+  const tx = t(lang)
 
   return (
-    <>
-      <Splash />
-      <Navbar demoMode={demoMode} setDemoMode={setDemoMode} />
-      
-      {demoMode === 'admin' ? (
-        <AdminPreview />
-      ) : demoMode === 'user' ? (
-        <UserDashboardPreview />
-      ) : (
-        <main>
-          <Hero />
-          <StatsSection />
-          <ArtistsCarousel />
-          <ContentFeed />
-          <CTASection />
-        </main>
-      )}
-      
-      <Footer />
-    </>
-  )
-}
+    <div className="app-shell">
+      <TopBar showLogo />
 
-function CTASection() {
-  return (
-    <section className="py-32 px-4">
-      <div className="max-w-3xl mx-auto text-center">
+      <main className="page-content">
+        {/* Hero card — compact */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.7 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative mx-4 mt-3 rounded-2xl overflow-hidden"
+          style={{ height: '200px' }}
         >
-          <p className="text-xs text-[#8B00FF] font-semibold uppercase tracking-widest mb-4">¿Listo para empezar?</p>
-          <h2 className="text-5xl md:text-6xl font-black mb-6 toon-gradient-text" style={{ fontFamily: "'Syne', sans-serif" }}>
-            Tu arte merece ser visto.
-          </h2>
-          <p className="text-gray-400 text-lg mb-10">
-            Únete a miles de artistas que ya comparten, colaboran y monetizan su trabajo en Toonimatics.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <motion.a
-              href="/auth/signin"
-              whileHover={{ scale: 1.04, boxShadow: '0 0 40px rgba(255,107,0,0.3)' }}
-              whileTap={{ scale: 0.97 }}
-              className="px-10 py-4 rounded-full text-white font-bold text-lg toon-gradient-bg shadow-xl"
-            >
-              Crear cuenta gratis
-            </motion.a>
+          <Image src="/hf/hero1.webp" alt="Hero" fill className="object-cover" priority />
+          <div className="absolute inset-0" style={{
+            background: 'linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.3) 60%, transparent 100%)'
+          }} />
+          {/* Hero video badge */}
+          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 text-xs text-white flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+            LIVE
+          </div>
+          <div className="absolute bottom-4 left-4 right-4">
+            <p className="text-xs text-[#FF6B00] font-semibold uppercase tracking-widest mb-1">
+              Plataforma artística
+            </p>
+            <h2 className="text-white text-xl font-black leading-tight" style={{ fontFamily: "'Syne', sans-serif" }}>
+              {tx.home.tagline}
+            </h2>
           </div>
         </motion.div>
-      </div>
-    </section>
-  )
-}
 
-function UserDashboardPreview() {
-  return (
-    <div className="min-h-screen pt-20 px-4">
-      <div className="max-w-6xl mx-auto py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          {/* Profile header */}
-          <div className="toon-card p-6 mb-6 flex items-center gap-5">
-            <div className="w-20 h-20 rounded-full toon-gradient-bg flex items-center justify-center text-3xl font-black text-white">S</div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-xl font-bold text-white">Sofía Reyes</h1>
-                <span className="text-[#FF6B00] text-sm">✓ Verificada</span>
-              </div>
-              <p className="text-gray-400 text-sm">🎬 Directora · 📍 Guadalajara</p>
-              <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                <span>2,847 seguidores</span>
-                <span>23 obras</span>
-                <span>$12,400 ganados</span>
+        {/* Quick stats row */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+          className="flex gap-3 px-4 mt-3 overflow-x-auto pb-1 no-scrollbar"
+        >
+          {[
+            { n: '12K+', l: lang === 'es' ? 'Artistas' : 'Artists', icon: '🎨' },
+            { n: '48K+', l: lang === 'es' ? 'Obras' : 'Works', icon: '🎬' },
+            { n: '3.2K+', l: lang === 'es' ? 'Colabs' : 'Collabs', icon: '🤝' },
+          ].map(s => (
+            <div key={s.l} className="flex-shrink-0 toon-card px-4 py-2.5 flex items-center gap-2">
+              <span>{s.icon}</span>
+              <div>
+                <div className="text-base font-black toon-gradient-text">{s.n}</div>
+                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>{s.l}</div>
               </div>
             </div>
-            <motion.button whileHover={{ scale: 1.03 }} className="px-5 py-2 rounded-full toon-gradient-bg text-white text-sm font-semibold">
-              + Subir obra
-            </motion.button>
-          </div>
-
-          {/* Stats cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            {[
-              { label: 'Visualizaciones', value: '45.2K', icon: '👁', color: '#FF6B00' },
-              { label: 'Seguidores nuevos', value: '+234', icon: '👥', color: '#FF1493' },
-              { label: 'Ventas mes', value: '$2,800', icon: '💰', color: '#8B00FF' },
-              { label: 'Colaboraciones', value: '7', icon: '🤝', color: '#FF6B00' },
-            ].map(stat => (
-              <div key={stat.label} className="toon-card p-4 text-center">
-                <div className="text-2xl mb-1">{stat.icon}</div>
-                <div className="text-xl font-black" style={{ color: stat.color }}>{stat.value}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Content grid */}
-          <h2 className="text-lg font-bold text-white mb-4">Mis obras</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {['Sombras del Pacífico', 'Reel 2024', 'Making-of Serie'].map((title, i) => (
-              <div key={title} className="toon-card overflow-hidden">
-                <div className="h-36 bg-gradient-to-br from-orange-900/40 to-purple-900/40 flex items-center justify-center text-4xl">🎬</div>
-                <div className="p-4">
-                  <p className="text-white text-sm font-semibold">{title}</p>
-                  <p className="text-gray-500 text-xs mt-1">{['45.2K', '23.1K', '8.7K'][i]} vistas · {['3.4K', '1.9K', '654'][i]} likes</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          ))}
         </motion.div>
-      </div>
+
+        {/* Featured content */}
+        <Section title={tx.home.featured} href="/explore">
+          <div className="flex gap-3 px-4 overflow-x-auto pb-1 no-scrollbar">
+            {FEATURED.map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * i }}
+                className="content-card flex-shrink-0 cursor-pointer"
+                style={{ width: '200px' }}
+              >
+                <div className="relative" style={{ height: '130px' }}>
+                  <Image src={item.img} alt={item.title} fill className="object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                  {item.featured && (
+                    <div className="absolute top-2 left-2 toon-gradient-bg rounded-full px-2 py-0.5 text-white text-[10px] font-bold">⭐ Top</div>
+                  )}
+                  <div className="absolute bottom-2 right-2 bg-black/70 rounded text-white text-[10px] px-1.5 py-0.5">{item.duration}</div>
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--c-text)' }}>{item.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>{item.author}</p>
+                  <div className="flex items-center gap-2 mt-1.5 text-xs" style={{ color: 'var(--c-muted)' }}>
+                    <span>👁 {item.views}</span>
+                    <span className="px-1.5 py-0.5 rounded-full" style={{ background: 'var(--c-surface2)', fontSize: '10px' }}>{item.type}</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </Section>
+
+        {/* Artists horizontal scroll */}
+        <Section title={tx.home.artists} href="/artists">
+          <div className="flex gap-3 px-4 overflow-x-auto pb-1 no-scrollbar">
+            {ARTISTS.map((a, i) => (
+              <motion.div
+                key={a.name}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.08 * i }}
+                className="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer"
+                style={{ width: '72px' }}
+              >
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden">
+                  <Image src={a.img} alt={a.name} fill className="object-cover" />
+                  {a.verified && (
+                    <div className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full toon-gradient-bg flex items-center justify-center text-white text-[9px] font-bold">✓</div>
+                  )}
+                </div>
+                <p className="text-center text-xs font-medium leading-tight" style={{ color: 'var(--c-text)' }}>{a.name}</p>
+                <p className="text-center text-[10px]" style={{ color: 'var(--c-muted)' }}>{a.role}</p>
+              </motion.div>
+            ))}
+          </div>
+        </Section>
+
+        {/* Recent works vertical feed */}
+        <Section title={tx.home.latest}>
+          <div className="px-4 space-y-3">
+            {FEATURED.map((item, i) => (
+              <motion.div
+                key={item.title + '-feed'}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * i }}
+                className="content-card flex gap-3 p-3 cursor-pointer"
+              >
+                <div className="relative flex-shrink-0 rounded-xl overflow-hidden" style={{ width: '80px', height: '80px' }}>
+                  <Image src={item.img} alt={item.title} fill className="object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm leading-tight truncate" style={{ color: 'var(--c-text)' }}>{item.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>{item.author}</p>
+                  <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: 'var(--c-muted)' }}>
+                    <span>👁 {item.views}</span>
+                    <span>⏱ {item.duration}</span>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 flex items-center">
+                  <div className="w-8 h-8 rounded-full toon-gradient-bg flex items-center justify-center text-white text-sm">▶</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </Section>
+
+        {/* CTA si es público */}
+        {demoMode === 'public' && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mx-4 my-4 p-5 rounded-2xl text-center neon-border"
+          >
+            <p className="text-base font-black toon-gradient-text mb-1" style={{ fontFamily: "'Syne', sans-serif" }}>
+              {lang === 'es' ? 'Tu arte merece ser visto.' : 'Your art deserves to be seen.'}
+            </p>
+            <p className="text-xs mb-3" style={{ color: 'var(--c-muted)' }}>{tx.home.sub}</p>
+            <motion.a
+              href="/auth/signin"
+              whileTap={{ scale: 0.97 }}
+              className="block w-full py-3 rounded-xl toon-gradient-bg text-white font-bold text-sm"
+            >
+              {tx.home.cta} ✨
+            </motion.a>
+          </motion.div>
+        )}
+      </main>
+
+      <BottomNav />
     </div>
   )
 }
 
-function AdminPreview() {
+function Section({ title, href, children }: { title: string; href?: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen pt-20 px-4">
-      <div className="max-w-6xl mx-auto py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-2 h-8 rounded-full bg-red-500" />
-            <h1 className="text-2xl font-black text-white" style={{ fontFamily: "'Syne', sans-serif" }}>Panel Administración</h1>
-            <span className="px-2 py-0.5 rounded text-xs bg-red-500/10 text-red-400 border border-red-500/20">ADMIN</span>
-          </div>
-
-          {/* Admin stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: 'Usuarios totales', value: '12,847', icon: '👥', trend: '+234 hoy' },
-              { label: 'Verificaciones pendientes', value: '47', icon: '📋', trend: 'Requieren revisión' },
-              { label: 'Contenido activo', value: '48,230', icon: '🎬', trend: '+127 hoy' },
-              { label: 'Revenue mes', value: '$84,200', icon: '💰', trend: '+12% vs anterior' },
-            ].map(stat => (
-              <div key={stat.label} className="toon-card p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-2xl">{stat.icon}</span>
-                  <span className="text-xs text-gray-500">{stat.trend}</span>
-                </div>
-                <div className="text-2xl font-black toon-gradient-text">{stat.value}</div>
-                <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Verifications queue */}
-          <div className="toon-card p-6 mb-6">
-            <h2 className="text-white font-bold mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-              Cola de verificaciones (47 pendientes)
-            </h2>
-            <div className="space-y-3">
-              {['Carlos Mendez — Actor — INE adjunto', 'María García — Directora — CV + Credencial', 'Juan Pérez — Músico — Constancia IMSS'].map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-[#1A1A1A] rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                      {item[0]}
-                    </div>
-                    <span className="text-gray-300 text-sm">{item}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <motion.button whileTap={{ scale: 0.95 }} className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20">
-                      ✓ Aprobar
-                    </motion.button>
-                    <motion.button whileTap={{ scale: 0.95 }} className="px-3 py-1 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
-                      ✗ Rechazar
-                    </motion.button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Navigation to full admin */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: 'Gestión de usuarios', icon: '👥', href: '/admin/users' },
-              { label: 'Moderación contenido', icon: '🛡', href: '/admin/content' },
-              { label: 'Reportes financieros', icon: '📊', href: '/admin/finance' },
-              { label: 'Configuración', icon: '⚙️', href: '/admin/settings' },
-            ].map(item => (
-              <motion.a key={item.label} href={item.href} whileHover={{ scale: 1.02, y: -2 }} className="toon-card p-4 text-center cursor-pointer">
-                <div className="text-3xl mb-2">{item.icon}</div>
-                <div className="text-xs text-gray-400">{item.label}</div>
-              </motion.a>
-            ))}
-          </div>
-        </motion.div>
+    <div className="mt-5">
+      <div className="flex items-center justify-between px-4 mb-3">
+        <h2 className="font-bold text-base" style={{ color: 'var(--c-text)' }}>{title}</h2>
+        {href && (
+          <a href={href} className="text-xs font-medium" style={{ color: 'var(--toon-orange)' }}>
+            Ver todos →
+          </a>
+        )}
       </div>
+      {children}
     </div>
   )
 }

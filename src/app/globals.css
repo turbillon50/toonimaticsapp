@@ -2,34 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== DESIGN TOKENS ===== */
 :root {
   --toon-orange: #FF6B00;
   --toon-magenta: #FF1493;
   --toon-purple: #8B00FF;
-  --toon-dark: #0A0A0A;
-  --toon-card: #111111;
-  --toon-border: #1E1E1E;
+  --c-bg: #0A0A0A;
+  --c-surface: #111111;
+  --c-surface2: #1A1A1A;
+  --c-border: #222222;
+  --c-text: #F0F0F0;
+  --c-muted: #888888;
+  --c-subtle: #444444;
+  --bottom-nav-h: 64px;
 }
 
-* { box-sizing: border-box; }
+[data-theme="light"] {
+  --c-bg: #F8F8F8;
+  --c-surface: #FFFFFF;
+  --c-surface2: #F0F0F0;
+  --c-border: #E0E0E0;
+  --c-text: #0A0A0A;
+  --c-muted: #666666;
+  --c-subtle: #BBBBBB;
+}
+
+/* ===== MOBILE FIRST RESET ===== */
+*, *::before, *::after { box-sizing: border-box; }
 
 html {
-  scroll-behavior: smooth;
-  scrollbar-width: thin;
-  scrollbar-color: #FF6B00 #111;
+  height: 100%;
+  /* Prevent iOS bounce */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: #0A0A0A;
-  color: #F0F0F0;
-  font-family: system-ui, -apple-system, sans-serif;
+  height: 100%;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
+  /* Safe area para iPhone notch */
+  padding-bottom: env(safe-area-inset-bottom);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: linear-gradient(#FF6B00, #8B00FF); border-radius: 2px; }
+#__next { height: 100%; }
 
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--toon-orange); border-radius: 2px; }
+
+/* ===== TOON UTILITIES ===== */
 .toon-gradient-text {
   background: linear-gradient(135deg, #FF6B00, #FF1493, #8B00FF);
   -webkit-background-clip: text;
@@ -41,58 +68,106 @@ body {
   background: linear-gradient(135deg, #FF6B00, #FF1493, #8B00FF);
 }
 
-.toon-glow {
-  box-shadow: 0 0 30px rgba(255, 107, 0, 0.3), 0 0 60px rgba(139, 0, 255, 0.15);
-}
-
 .toon-card {
-  background: #111111;
-  border: 1px solid #1E1E1E;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
   border-radius: 16px;
-  transition: all 0.3s ease;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-.toon-card:hover {
-  border-color: rgba(255, 107, 0, 0.3);
-  box-shadow: 0 8px 32px rgba(255, 107, 0, 0.1), 0 0 0 1px rgba(255, 20, 147, 0.1);
-  transform: translateY(-2px);
-}
+.toon-card:active { transform: scale(0.98); }
 
 .glass {
-  background: rgba(17, 17, 17, 0.8);
+  background: rgba(10,10,10,0.85);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--c-border);
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+[data-theme="light"] .glass {
+  background: rgba(248,248,248,0.9);
 }
 
+.neon-border {
+  border: 1px solid transparent;
+  background: linear-gradient(var(--c-surface), var(--c-surface)) padding-box,
+              linear-gradient(135deg, #FF6B00, #FF1493, #8B00FF) border-box;
+}
+
+/* ===== MOBILE APP LAYOUT ===== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  height: var(--bottom-nav-h);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border);
+}
+
+/* ===== CARDS ===== */
+.content-card {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  transition: all 0.2s ease;
+}
+
+.content-card:active { transform: scale(0.97); opacity: 0.9; }
+
+/* ===== SKELETON ===== */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-.animate-float { animation: float 6s ease-in-out infinite; }
-
 .skeleton {
-  background: linear-gradient(90deg, #111 25%, #1E1E1E 50%, #111 75%);
+  background: linear-gradient(90deg, var(--c-surface2) 25%, var(--c-border) 50%, var(--c-surface2) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.4s infinite;
   border-radius: 8px;
 }
 
-.neon-border {
-  border: 1px solid transparent;
-  background-clip: padding-box;
-  position: relative;
+/* ===== ANIMATIONS ===== */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.neon-border::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, #FF6B00, #FF1493, #8B00FF);
-  z-index: -1;
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
+
+.animate-fade-up { animation: fadeUp 0.4s ease forwards; }
+.animate-float { animation: floatY 4s ease-in-out infinite; }
+
+/* ===== TAP HIGHLIGHT ===== */
+a, button { -webkit-tap-highlight-color: transparent; }
+
+/* ===== SAFE AREA ===== */
+.safe-top { padding-top: max(env(safe-area-inset-top), 12px); }
