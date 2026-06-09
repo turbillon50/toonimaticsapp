@@ -1,5 +1,5 @@
 'use client'
-import { motion, AnimatePresence, useInView, useAnimation } from 'framer-motion'
+import { motion, AnimatePresence, useInView } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 
 export { motion, AnimatePresence }
@@ -79,30 +79,6 @@ export function HoverCard({ children, className = '' }: { children: React.ReactN
   )
 }
 
-export function NumberCounter({ to, duration = 2 }: { to: number; duration?: number }) {
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true })
-  const controls = useAnimation()
-
-  return (
-    <motion.span
-      ref={ref}
-      initial={{ opacity: 0 }}
-      animate={isInView ? { opacity: 1 } : {}}
-    >
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={isInView ? { opacity: 1 } : {}}
-        onAnimationComplete={() => {}}
-      >
-        {isInView ? (
-          <Counter to={to} duration={duration} />
-        ) : '0'}
-      </motion.span>
-    </motion.span>
-  )
-}
-
 function Counter({ to, duration }: { to: number; duration: number }) {
   const nodeRef = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -118,4 +94,14 @@ function Counter({ to, duration }: { to: number; duration: number }) {
     return () => clearInterval(timer)
   }, [to, duration])
   return <span ref={nodeRef}>0</span>
+}
+
+export function NumberCounter({ to, duration = 2 }: { to: number; duration?: number }) {
+  const ref = useRef(null)
+  const isInView = useInView(ref, { once: true })
+  return (
+    <span ref={ref}>
+      {isInView ? <Counter to={to} duration={duration} /> : '0'}
+    </span>
+  )
 }
