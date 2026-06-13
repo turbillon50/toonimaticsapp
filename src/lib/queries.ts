@@ -300,6 +300,23 @@ export async function getNotificaciones(userId: UUID, limit = 30): Promise<Notif
   `
 }
 
+export async function marcarNotificacionLeida(id: UUID): Promise<Notificacion | null> {
+  const notificaciones = await sql<Notificacion[]>`
+    UPDATE toon.notificaciones
+    SET leida = true
+    WHERE id = ${id}
+    RETURNING
+      id,
+      user_id,
+      tipo,
+      mensaje,
+      leida,
+      created_at
+  `
+
+  return notificaciones[0] ?? null
+}
+
 export async function searchProyectos(query: string, limit = 24): Promise<Proyecto[]> {
   const safeQuery = query.trim()
 
