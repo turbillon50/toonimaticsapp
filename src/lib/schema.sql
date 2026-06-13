@@ -1,114 +1,272 @@
--- Toonimatics DB Schema
+-- Toonimatics database schema
+-- Tables live in the toon schema to match the app database access pattern.
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA IF NOT EXISTS toon;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.rol_jerarquia AS ENUM ('creador', 'trabajador', 'espectador');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.rama_artistica AS ENUM (
+    'cine',
+    'ilustracion',
+    'animacion',
+    'literatura',
+    'escultura',
+    'tech',
+    'audiovisual',
+    'actuacion',
+    'musica'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.estado_proyecto AS ENUM ('en_proceso', 'terminado');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.estado_proyecto_miembro AS ENUM ('solicitud', 'activo', 'expulsado');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.estado_reporte AS ENUM ('pendiente', 'en_revision', 'resuelto', 'descartado');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.estado_amistad AS ENUM ('solicitud', 'activo', 'bloqueado');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+DO $$
+BEGIN
+  CREATE TYPE toon.tipo_contenido AS ENUM ('imagen', 'animacion', 'audio');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END;
+$$;
+
+CREATE TABLE IF NOT EXISTS toon.users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  name VARCHAR(255),
-  username VARCHAR(100) UNIQUE,
-  avatar_url TEXT,
-  cover_url TEXT,
-  bio TEXT,
-  role VARCHAR(50) DEFAULT 'viewer' CHECK (role IN ('viewer','artist','studio','admin')),
-  artistic_role VARCHAR(100),
-  location VARCHAR(255),
-  website VARCHAR(255),
-  instagram VARCHAR(100),
-  tiktok VARCHAR(100),
-  youtube VARCHAR(100),
-  facebook VARCHAR(100),
-  verified BOOLEAN DEFAULT false,
-  verification_status VARCHAR(50) DEFAULT 'none' CHECK (verification_status IN ('none','pending','approved','rejected')),
-  followers_count INT DEFAULT 0,
-  following_count INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  email TEXT NOT NULL,
+  telefono TEXT,
+  nombre TEXT,
+  apodo TEXT,
+  descripcion TEXT,
+  foto_url TEXT,
+  rol_jerarquia toon.rol_jerarquia NOT NULL DEFAULT 'espectador',
+  edad INTEGER CHECK (edad IS NULL OR (edad >= 0 AND edad <= 130)),
+  verificado_real BOOLEAN NOT NULL DEFAULT false,
+  control_parental BOOLEAN NOT NULL DEFAULT false,
+  fecha_nacimiento DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS content (
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key
+  ON toon.users (lower(email));
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_telefono_key
+  ON toon.users (telefono)
+  WHERE telefono IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_apodo_lower_key
+  ON toon.users (lower(apodo))
+  WHERE apodo IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS toon.user_ramas (
+  user_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  rama_id toon.rama_artistica NOT NULL,
+  subtitulo TEXT NOT NULL CHECK (char_length(trim(subtitulo)) > 0),
+  experiencia_texto TEXT,
+  PRIMARY KEY (user_id, rama_id, subtitulo)
+);
+
+CREATE INDEX IF NOT EXISTS user_ramas_rama_id_idx
+  ON toon.user_ramas (rama_id);
+
+CREATE TABLE IF NOT EXISTS toon.proyectos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  title VARCHAR(500) NOT NULL,
-  description TEXT,
-  type VARCHAR(50) CHECK (type IN ('video','short','series','film','photo','audio','document')),
-  thumbnail_url TEXT,
-  media_url TEXT,
-  duration INT,
-  genre VARCHAR(100),
-  tags TEXT[],
-  views_count INT DEFAULT 0,
-  likes_count INT DEFAULT 0,
-  comments_count INT DEFAULT 0,
-  is_published BOOLEAN DEFAULT false,
-  is_featured BOOLEAN DEFAULT false,
-  price DECIMAL(10,2) DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  creador_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  nombre TEXT NOT NULL CHECK (char_length(trim(nombre)) > 0),
+  descripcion TEXT,
+  estado toon.estado_proyecto NOT NULL DEFAULT 'en_proceso',
+  portada_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS follows (
-  follower_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  following_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (follower_id, following_id)
+CREATE INDEX IF NOT EXISTS proyectos_creador_id_idx
+  ON toon.proyectos (creador_id);
+
+CREATE INDEX IF NOT EXISTS proyectos_estado_created_at_idx
+  ON toon.proyectos (estado, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS toon.proyecto_miembros (
+  proyecto_id UUID NOT NULL REFERENCES toon.proyectos(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  subtitulo TEXT NOT NULL CHECK (char_length(trim(subtitulo)) > 0),
+  estado toon.estado_proyecto_miembro NOT NULL DEFAULT 'solicitud',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (proyecto_id, user_id)
 );
 
-CREATE TABLE IF NOT EXISTS likes (
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  content_id UUID REFERENCES content(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (user_id, content_id)
-);
+CREATE INDEX IF NOT EXISTS proyecto_miembros_user_id_idx
+  ON toon.proyecto_miembros (user_id);
 
-CREATE TABLE IF NOT EXISTS messages (
+CREATE INDEX IF NOT EXISTS proyecto_miembros_estado_idx
+  ON toon.proyecto_miembros (estado);
+
+CREATE TABLE IF NOT EXISTS toon.tareas_studio (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  receiver_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  body TEXT NOT NULL,
-  read BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  proyecto_id UUID NOT NULL REFERENCES toon.proyectos(id) ON DELETE CASCADE,
+  asignado_a UUID REFERENCES toon.users(id) ON DELETE SET NULL,
+  titulo TEXT NOT NULL CHECK (char_length(trim(titulo)) > 0),
+  descripcion TEXT,
+  completada BOOLEAN NOT NULL DEFAULT false,
+  puntos INTEGER NOT NULL DEFAULT 0 CHECK (puntos >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS products (
+CREATE INDEX IF NOT EXISTS tareas_studio_proyecto_id_idx
+  ON toon.tareas_studio (proyecto_id);
+
+CREATE INDEX IF NOT EXISTS tareas_studio_asignado_a_idx
+  ON toon.tareas_studio (asignado_a);
+
+CREATE TABLE IF NOT EXISTS toon.puntos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(500) NOT NULL,
-  description TEXT,
-  price DECIMAL(10,2) NOT NULL,
-  image_url TEXT,
-  type VARCHAR(50) CHECK (type IN ('physical','digital','service')),
-  stock INT DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  sales_count INT DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  user_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  proyecto_id UUID NOT NULL REFERENCES toon.proyectos(id) ON DELETE CASCADE,
+  cantidad INTEGER NOT NULL CHECK (cantidad <> 0),
+  motivo TEXT NOT NULL CHECK (char_length(trim(motivo)) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS orders (
+CREATE INDEX IF NOT EXISTS puntos_user_id_idx
+  ON toon.puntos (user_id);
+
+CREATE INDEX IF NOT EXISTS puntos_proyecto_id_idx
+  ON toon.puntos (proyecto_id);
+
+CREATE TABLE IF NOT EXISTS toon.valoraciones (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  buyer_id UUID REFERENCES users(id),
-  product_id UUID REFERENCES products(id),
-  amount DECIMAL(10,2) NOT NULL,
-  commission DECIMAL(10,2) NOT NULL,
-  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending','paid','delivered','cancelled')),
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  evaluador_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  evaluado_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  proyecto_id UUID NOT NULL REFERENCES toon.proyectos(id) ON DELETE CASCADE,
+  estrellas INTEGER NOT NULL CHECK (estrellas >= 1 AND estrellas <= 5),
+  comentario TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (evaluador_id <> evaluado_id)
 );
 
-CREATE TABLE IF NOT EXISTS verifications (
+CREATE UNIQUE INDEX IF NOT EXISTS valoraciones_unicas_por_proyecto_idx
+  ON toon.valoraciones (evaluador_id, evaluado_id, proyecto_id);
+
+CREATE INDEX IF NOT EXISTS valoraciones_evaluado_id_idx
+  ON toon.valoraciones (evaluado_id);
+
+CREATE INDEX IF NOT EXISTS valoraciones_proyecto_id_idx
+  ON toon.valoraciones (proyecto_id);
+
+CREATE TABLE IF NOT EXISTS toon.reportes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  document_type VARCHAR(100),
-  document_url TEXT,
-  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
-  reviewer_notes TEXT,
-  reviewed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  reportante_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  reportado_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  motivo TEXT NOT NULL CHECK (char_length(trim(motivo)) > 0),
+  estado toon.estado_reporte NOT NULL DEFAULT 'pendiente',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (reportante_id <> reportado_id)
 );
 
-CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  type VARCHAR(100),
-  title VARCHAR(255),
-  body TEXT,
-  read BOOLEAN DEFAULT false,
-  data JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+CREATE INDEX IF NOT EXISTS reportes_reportado_id_estado_idx
+  ON toon.reportes (reportado_id, estado);
+
+CREATE TABLE IF NOT EXISTS toon.seguidores (
+  seguidor_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  seguido_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  PRIMARY KEY (seguidor_id, seguido_id),
+  CHECK (seguidor_id <> seguido_id)
 );
+
+CREATE INDEX IF NOT EXISTS seguidores_seguido_id_idx
+  ON toon.seguidores (seguido_id);
+
+CREATE TABLE IF NOT EXISTS toon.proyectos_fav (
+  user_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  proyecto_id UUID NOT NULL REFERENCES toon.proyectos(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, proyecto_id)
+);
+
+CREATE INDEX IF NOT EXISTS proyectos_fav_proyecto_id_idx
+  ON toon.proyectos_fav (proyecto_id);
+
+CREATE TABLE IF NOT EXISTS toon.amigos (
+  user_a UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  user_b UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  estado toon.estado_amistad NOT NULL DEFAULT 'solicitud',
+  PRIMARY KEY (user_a, user_b),
+  CHECK (user_a <> user_b)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS amigos_par_unico_idx
+  ON toon.amigos (least(user_a::text, user_b::text), greatest(user_a::text, user_b::text));
+
+CREATE INDEX IF NOT EXISTS amigos_user_b_idx
+  ON toon.amigos (user_b);
+
+CREATE INDEX IF NOT EXISTS amigos_estado_idx
+  ON toon.amigos (estado);
+
+CREATE TABLE IF NOT EXISTS toon.notificaciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL CHECK (char_length(trim(tipo)) > 0),
+  mensaje TEXT NOT NULL CHECK (char_length(trim(mensaje)) > 0),
+  leida BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS notificaciones_user_id_created_at_idx
+  ON toon.notificaciones (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS notificaciones_user_id_leida_idx
+  ON toon.notificaciones (user_id, leida);
+
+CREATE TABLE IF NOT EXISTS toon.contenido (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES toon.users(id) ON DELETE CASCADE,
+  tipo toon.tipo_contenido NOT NULL,
+  url TEXT NOT NULL CHECK (char_length(trim(url)) > 0),
+  titulo TEXT NOT NULL CHECK (char_length(trim(titulo)) > 0),
+  likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS contenido_user_id_created_at_idx
+  ON toon.contenido (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS contenido_tipo_idx
+  ON toon.contenido (tipo);
