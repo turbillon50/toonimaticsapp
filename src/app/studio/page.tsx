@@ -1,194 +1,170 @@
-'use client'
-
-import { motion } from 'framer-motion'
-import { Award, Clock3, PanelsTopLeft, Sparkles } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
 import BottomNav from '@/components/layout/BottomNav'
 import TopBar from '@/components/layout/TopBar'
-import TareaCard, { type TareaStudio } from '@/components/studio/TareaCard'
-import { getRama, variarColor } from '@/lib/ramas'
+import {
+  getProyecto,
+  getTareasByProyecto,
+  getUserById,
+  getUserRamas,
+  listProyectos,
+  type Proyecto,
+  type TareaStudio as DbTareaStudio,
+  type ToonUser,
+} from '@/lib/queries'
+import type { RamaId } from '@/lib/ramas'
+import StudioClient, { type StudioProyecto, type StudioTareaItem } from './StudioClient'
 
-const TAREAS_DEMO: TareaStudio[] = [
-  {
-    id: 'storyboard-acto-1',
-    titulo: 'Limpiar storyboard del acto 1',
-    descripcion: 'Ajustar continuidad visual, numerar planos y dejar notas claras para animacion.',
-    puntos: 140,
-    ramaId: 'ilustracion',
-    vencimiento: 'Hoy, 18:00',
-    prioridad: 'alta',
-  },
-  {
-    id: 'animatic-calle',
-    titulo: 'Exportar animatic de la escena Calle Sur',
-    descripcion: 'Sincronizar el corte con voces temporales y subir una version de revision.',
-    puntos: 180,
-    ramaId: 'animacion',
-    vencimiento: 'Manana, 11:00',
-    prioridad: 'alta',
-  },
-  {
-    id: 'voz-guia',
-    titulo: 'Grabar guia de voz para Luna',
-    descripcion: 'Entregar tres lecturas con tono intimo y una toma alternativa mas energica.',
-    puntos: 95,
-    ramaId: 'actuacion',
-    vencimiento: 'Jun 15',
-    prioridad: 'media',
-  },
-  {
-    id: 'score-puente',
-    titulo: 'Boceto musical del puente emocional',
-    descripcion: 'Crear una maqueta de 30 segundos con textura andina y pulso cinematografico.',
-    puntos: 120,
-    ramaId: 'musica',
-    vencimiento: 'Jun 16',
-    prioridad: 'media',
-  },
-  {
-    id: 'pipeline-assets',
-    titulo: 'Ordenar assets para handoff',
-    descripcion: 'Revisar nombres de archivos, versiones y carpetas antes de pasar a composicion.',
-    puntos: 80,
-    ramaId: 'tech',
-    vencimiento: 'Jun 17',
-    prioridad: 'baja',
-  },
-]
+export const dynamic = 'force-dynamic'
 
-const PROYECTO = {
-  nombre: 'Bruma Andina',
-  creadora: 'Marisol Vega',
-  rol: 'Trabajador de animacion',
-  ramaId: 'animacion' as const,
+interface StudioPageProps {
+  searchParams?: {
+    proyecto?: string | string[]
+  }
 }
 
-export default function StudioPage() {
-  const [tareasCompletadas, setTareasCompletadas] = useState<string[]>(['storyboard-acto-1'])
-  const rama = getRama(PROYECTO.ramaId)
-  const color = rama?.color ?? '#F2C53D'
-  const colorOscuro = variarColor(color, -0.24)
+const DEFAULT_RAMA: RamaId = 'animacion'
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  const resumen = useMemo(() => {
-    const completadas = TAREAS_DEMO.filter((tarea) => tareasCompletadas.includes(tarea.id))
-    const puntosGanados = completadas.reduce((total, tarea) => total + tarea.puntos, 0)
-    const puntosTotales = TAREAS_DEMO.reduce((total, tarea) => total + tarea.puntos, 0)
-    const progreso = Math.round((completadas.length / TAREAS_DEMO.length) * 100)
-
-    return {
-      completadas: completadas.length,
-      pendientes: TAREAS_DEMO.length - completadas.length,
-      puntosGanados,
-      puntosTotales,
-      progreso,
-    }
-  }, [tareasCompletadas])
-
-  function toggleTarea(id: string) {
-    setTareasCompletadas((actuales) =>
-      actuales.includes(id) ? actuales.filter((tareaId) => tareaId !== id) : [...actuales, id],
-    )
-  }
+export default async function StudioPage({ searchParams }: StudioPageProps) {
+  const proyecto = await resolveProyecto(searchParams)
+  const studioData = proyecto ? await getStudioData(proyecto) : { proyecto: null, tareas: [] }
 
   return (
     <div className="app-shell">
       <TopBar title="STUDIO" />
       <main className="page-content">
-        <section className="px-3 pt-3">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden rounded-2xl border"
-            style={{
-              borderColor: `${color}66`,
-              background: `linear-gradient(135deg, rgba(17,17,17,0.96), rgba(17,17,17,0.82)), radial-gradient(circle at top right, ${color}3D, transparent 46%)`,
-            }}
-          >
-            <div className="p-4">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="mb-1 text-xs font-bold text-[var(--c-muted)]">Proyecto activo</p>
-                  <h1 className="text-2xl font-black leading-tight text-[var(--c-text)]">{PROYECTO.nombre}</h1>
-                  <p className="mt-1 text-xs text-[var(--c-muted)]">
-                    {PROYECTO.rol} para {PROYECTO.creadora}
-                  </p>
-                </div>
-                <span
-                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-white"
-                  style={{ background: `linear-gradient(135deg, ${color}, ${colorOscuro})` }}
-                >
-                  <PanelsTopLeft size={20} />
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <Metric icon={<Sparkles size={15} />} label="Puntos" value={resumen.puntosGanados.toString()} color={color} />
-                <Metric icon={<Award size={15} />} label="Listas" value={`${resumen.completadas}/${TAREAS_DEMO.length}`} color={color} />
-                <Metric icon={<Clock3 size={15} />} label="Pend." value={resumen.pendientes.toString()} color={color} />
-              </div>
-
-              <div className="mt-4">
-                <div className="mb-2 flex items-center justify-between text-xs font-semibold text-[var(--c-muted)]">
-                  <span>Progreso de asignacion</span>
-                  <motion.span key={resumen.progreso} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
-                    {resumen.progreso}%
-                  </motion.span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-black/35">
-                  <motion.div
-                    className="h-full rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${resumen.progreso}%` }}
-                    transition={{ type: 'spring', stiffness: 120, damping: 22 }}
-                    style={{ background: `linear-gradient(90deg, ${colorOscuro}, ${color})` }}
-                  />
-                </div>
-                <p className="mt-2 text-[11px] text-[var(--c-muted)]">
-                  {resumen.puntosGanados} de {resumen.puntosTotales} puntos disponibles ganados.
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </section>
-
-        <section className="px-3 pb-4 pt-5">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-base font-black text-[var(--c-text)]">Tareas asignadas</h2>
-              <p className="text-xs text-[var(--c-muted)]">{rama?.nombre ?? 'Rama artistica'} en produccion</p>
-            </div>
-            <span className="rounded-full bg-[var(--c-surface2)] px-2.5 py-1 text-[11px] font-bold text-[var(--c-muted)]">
-              {resumen.completadas} completadas
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {TAREAS_DEMO.map((tarea, index) => (
-              <TareaCard
-                key={tarea.id}
-                tarea={tarea}
-                index={index}
-                completada={tareasCompletadas.includes(tarea.id)}
-                onToggle={toggleTarea}
-              />
-            ))}
-          </div>
-        </section>
+        <StudioClient
+          key={studioData.proyecto?.id ?? 'sin-proyecto'}
+          proyecto={studioData.proyecto}
+          tareas={studioData.tareas}
+        />
       </main>
       <BottomNav />
     </div>
   )
 }
 
-function Metric({ icon, label, value, color }: { icon: ReactNode; label: string; value: string; color: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-black/25 p-2.5">
-      <div className="mb-1 flex items-center gap-1.5 text-[var(--c-muted)]">
-        <span style={{ color }}>{icon}</span>
-        <span className="text-[10px] font-bold">{label}</span>
-      </div>
-      <p className="text-lg font-black leading-none text-[var(--c-text)]">{value}</p>
-    </div>
+async function resolveProyecto(searchParams?: StudioPageProps['searchParams']): Promise<Proyecto | null> {
+  const proyectoId = getProyectoId(searchParams)
+
+  if (proyectoId) {
+    const proyecto = await getProyecto(proyectoId)
+
+    if (proyecto) {
+      return proyecto
+    }
+  }
+
+  const proyectos = await listProyectos()
+
+  return proyectos.find((proyecto) => proyecto.estado === 'en_proceso') ?? proyectos[0] ?? null
+}
+
+async function getStudioData(proyecto: Proyecto): Promise<{ proyecto: StudioProyecto; tareas: StudioTareaItem[] }> {
+  const [tareas, creador] = await Promise.all([
+    getTareasByProyecto(proyecto.id),
+    getUserById(proyecto.creador_id),
+  ])
+  const userIds = getUserIds(proyecto.creador_id, tareas)
+  const ramaPorUsuario = await getRamaPorUsuario(userIds)
+  const fallbackRama = ramaPorUsuario.get(proyecto.creador_id) ?? DEFAULT_RAMA
+  const tareasStudio = tareas.map((tarea) => toStudioTarea(tarea, ramaPorUsuario, fallbackRama))
+  const ramaPrincipal = tareasStudio.find((tarea) => !tarea.completada)?.ramaId ?? tareasStudio[0]?.ramaId ?? fallbackRama
+
+  return {
+    proyecto: {
+      id: proyecto.id,
+      nombre: proyecto.nombre,
+      creador: getNombreCreador(creador, proyecto.creador_id),
+      rol: proyecto.estado === 'en_proceso' ? 'Proyecto en proceso' : 'Proyecto terminado',
+      ramaId: ramaPrincipal,
+    },
+    tareas: tareasStudio,
+  }
+}
+
+function getProyectoId(searchParams?: StudioPageProps['searchParams']): string | null {
+  const rawProyecto = searchParams?.proyecto
+  const proyecto = Array.isArray(rawProyecto) ? rawProyecto[0] : rawProyecto
+
+  if (!proyecto || !UUID_PATTERN.test(proyecto)) {
+    return null
+  }
+
+  return proyecto
+}
+
+function getUserIds(creadorId: string, tareas: DbTareaStudio[]): string[] {
+  const userIds = new Set<string>([creadorId])
+
+  tareas.forEach((tarea) => {
+    if (tarea.asignado_a) {
+      userIds.add(tarea.asignado_a)
+    }
+  })
+
+  return Array.from(userIds)
+}
+
+async function getRamaPorUsuario(userIds: string[]): Promise<Map<string, RamaId>> {
+  const entries = await Promise.all(
+    userIds.map(async (userId) => {
+      const ramas = await getUserRamas(userId)
+
+      return [userId, ramas[0]?.rama_id] as const
+    }),
   )
+  const ramaPorUsuario = new Map<string, RamaId>()
+
+  entries.forEach(([userId, ramaId]) => {
+    if (ramaId) {
+      ramaPorUsuario.set(userId, ramaId)
+    }
+  })
+
+  return ramaPorUsuario
+}
+
+function toStudioTarea(
+  tarea: DbTareaStudio,
+  ramaPorUsuario: Map<string, RamaId>,
+  fallbackRama: RamaId,
+): StudioTareaItem {
+  return {
+    id: tarea.id,
+    titulo: tarea.titulo,
+    descripcion: tarea.descripcion?.trim() || 'Tarea asignada al equipo del proyecto.',
+    puntos: tarea.puntos,
+    ramaId: tarea.asignado_a ? ramaPorUsuario.get(tarea.asignado_a) ?? fallbackRama : fallbackRama,
+    vencimiento: formatFechaAsignacion(tarea.created_at),
+    prioridad: getPrioridad(tarea.puntos),
+    completada: tarea.completada,
+  }
+}
+
+function getPrioridad(puntos: number): StudioTareaItem['prioridad'] {
+  if (puntos >= 150) {
+    return 'alta'
+  }
+
+  if (puntos >= 100) {
+    return 'media'
+  }
+
+  return 'baja'
+}
+
+function formatFechaAsignacion(createdAt: Date): string {
+  const formatter = new Intl.DateTimeFormat('es', {
+    day: 'numeric',
+    month: 'short',
+  })
+
+  return `Asignada ${formatter.format(createdAt)}`
+}
+
+function getNombreCreador(user: ToonUser | null, creadorId: string): string {
+  const name = user?.name?.trim()
+  const username = user?.username?.trim()
+
+  return name || username || `Creador ${creadorId.slice(0, 8)}`
 }

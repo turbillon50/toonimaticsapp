@@ -66,6 +66,21 @@ export function PortfolioGrid({ items, lang }: PortfolioGridProps): JSX.Element 
   const visualItems = items.filter((item) => item.tipo !== 'audio')
   const audioItems = items.filter((item) => item.tipo === 'audio')
 
+  if (items.length === 0) {
+    return (
+      <div className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+        <p className="text-sm font-bold text-[var(--c-text)]">
+          {lang === 'es' ? 'Aun no hay contenido publicado.' : 'No published content yet.'}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--c-muted)]">
+          {lang === 'es'
+            ? 'El portfolio se llenara automaticamente cuando este usuario suba imagenes, animaciones o audio.'
+            : 'The portfolio will update automatically when this user uploads images, animation, or audio.'}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-2.5">
@@ -117,7 +132,7 @@ function VisualPortfolioCard({
     >
       <div className="relative aspect-[4/5] bg-[var(--c-surface2)]">
         {item.thumbnailUrl ? (
-          <Image src={item.thumbnailUrl} alt={item.titulo} fill sizes="190px" className="object-cover" />
+          <Image src={item.thumbnailUrl} alt={item.titulo} fill unoptimized sizes="190px" className="object-cover" />
         ) : (
           <div className="flex h-full items-center justify-center text-[var(--c-muted)]">
             <Icon size={28} aria-hidden="true" />

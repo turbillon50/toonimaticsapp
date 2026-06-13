@@ -1,5 +1,5 @@
 import sql from './db'
-import type { RamaId, RolJerarquia } from './ramas'
+import type { RamaId } from './ramas'
 
 export type UUID = string
 
@@ -10,16 +10,21 @@ export type ContenidoTipo = 'imagen' | 'animacion' | 'audio'
 export interface ToonUser {
   id: UUID
   email: string
-  telefono: string | null
-  nombre: string | null
-  apodo: string | null
-  descripcion: string | null
-  foto_url: string | null
-  rol_jerarquia: RolJerarquia
-  edad: number | null
-  verificado_real: boolean
-  control_parental: boolean
-  fecha_nacimiento: string | null
+  name: string | null
+  username: string | null
+  avatar_url: string | null
+  cover_url: string | null
+  bio: string | null
+  role: string
+  artistic_role: string | null
+  location: string | null
+  instagram: string | null
+  tiktok: string | null
+  youtube: string | null
+  verified: boolean
+  verification_status: string | null
+  followers_count: number
+  following_count: number
   created_at: Date
 }
 
@@ -38,6 +43,17 @@ export interface Proyecto {
   estado: ProyectoEstado
   portada_url: string | null
   created_at: Date
+}
+
+export interface ProyectoMiembro {
+  proyecto_id: UUID
+  user_id: UUID
+  subtitulo: string
+  estado: ProyectoMiembroEstado
+  name: string | null
+  username: string | null
+  avatar_url: string | null
+  artistic_role: string | null
 }
 
 export interface TareaStudio {
@@ -70,6 +86,11 @@ export interface Contenido {
   created_at: Date
 }
 
+export interface UserPuntos {
+  user_id: UUID
+  puntos: number
+}
+
 const clampLimit = (limit: number, max: number) => {
   const integerLimit = Number.isFinite(limit) ? Math.trunc(limit) : max
 
@@ -81,19 +102,59 @@ export async function getUserById(id: UUID): Promise<ToonUser | null> {
     SELECT
       id,
       email,
-      telefono,
-      nombre,
-      apodo,
-      descripcion,
-      foto_url,
-      rol_jerarquia,
-      edad,
-      verificado_real,
-      control_parental,
-      fecha_nacimiento,
+      name,
+      username,
+      avatar_url,
+      cover_url,
+      bio,
+      role,
+      artistic_role,
+      location,
+      instagram,
+      tiktok,
+      youtube,
+      verified,
+      verification_status,
+      COALESCE(followers_count, 0)::int AS followers_count,
+      COALESCE(following_count, 0)::int AS following_count,
       created_at
     FROM toon.users
     WHERE id = ${id}
+    LIMIT 1
+  `
+
+  return users[0] ?? null
+}
+
+export async function getUserByUsername(username: string): Promise<ToonUser | null> {
+  const safeUsername = username.trim()
+
+  if (!safeUsername) {
+    return null
+  }
+
+  const users = await sql<ToonUser[]>`
+    SELECT
+      id,
+      email,
+      name,
+      username,
+      avatar_url,
+      cover_url,
+      bio,
+      role,
+      artistic_role,
+      location,
+      instagram,
+      tiktok,
+      youtube,
+      verified,
+      verification_status,
+      COALESCE(followers_count, 0)::int AS followers_count,
+      COALESCE(following_count, 0)::int AS following_count,
+      created_at
+    FROM toon.users
+    WHERE lower(username) = lower(${safeUsername})
     LIMIT 1
   `
 
@@ -149,6 +210,49 @@ export async function getProyecto(id: UUID): Promise<Proyecto | null> {
   return proyectos[0] ?? null
 }
 
+export async function getProyectoMiembros(proyectoId: UUID): Promise<ProyectoMiembro[]> {
+  return sql<ProyectoMiembro[]>`
+    SELECT
+      pm.proyecto_id,
+      pm.user_id,
+      pm.subtitulo,
+      pm.estado,
+      u.name,
+      u.username,
+      u.avatar_url,
+      u.artistic_role
+    FROM toon.proyecto_miembros pm
+    INNER JOIN toon.users u ON u.id = pm.user_id
+    WHERE pm.proyecto_id = ${proyectoId}
+    ORDER BY
+      CASE pm.estado
+        WHEN 'activo' THEN 0
+        WHEN 'solicitud' THEN 1
+        ELSE 2
+      END,
+      u.name ASC
+  `
+}
+
+export async function listProyectosByCreador(creadorId: UUID, limit = 24): Promise<Proyecto[]> {
+  const safeLimit = clampLimit(limit, 100)
+
+  return sql<Proyecto[]>`
+    SELECT
+      id,
+      creador_id,
+      nombre,
+      descripcion,
+      estado,
+      portada_url,
+      created_at
+    FROM toon.proyectos
+    WHERE creador_id = ${creadorId}
+    ORDER BY created_at DESC
+    LIMIT ${safeLimit}
+  `
+}
+
 export async function getTareasByProyecto(proyectoId: UUID): Promise<TareaStudio[]> {
   return sql<TareaStudio[]>`
     SELECT
@@ -166,6 +270,18 @@ export async function getTareasByProyecto(proyectoId: UUID): Promise<TareaStudio
   `
 }
 
+export async function getPuntosByUser(userId: UUID): Promise<UserPuntos> {
+  const puntos = await sql<UserPuntos[]>`
+    SELECT
+      ${userId}::uuid AS user_id,
+      COALESCE(SUM(cantidad), 0)::int AS puntos
+    FROM toon.puntos
+    WHERE user_id = ${userId}
+  `
+
+  return puntos[0] ?? { user_id: userId, puntos: 0 }
+}
+
 export async function getNotificaciones(userId: UUID, limit = 30): Promise<Notificacion[]> {
   const safeLimit = clampLimit(limit, 100)
 
@@ -180,6 +296,71 @@ export async function getNotificaciones(userId: UUID, limit = 30): Promise<Notif
     FROM toon.notificaciones
     WHERE user_id = ${userId}
     ORDER BY leida ASC, created_at DESC
+    LIMIT ${safeLimit}
+  `
+}
+
+export async function searchProyectos(query: string, limit = 24): Promise<Proyecto[]> {
+  const safeQuery = query.trim()
+
+  if (!safeQuery) {
+    return []
+  }
+
+  const safeLimit = clampLimit(limit, 100)
+  const pattern = `%${safeQuery}%`
+
+  return sql<Proyecto[]>`
+    SELECT
+      id,
+      creador_id,
+      nombre,
+      descripcion,
+      estado,
+      portada_url,
+      created_at
+    FROM toon.proyectos
+    WHERE nombre ILIKE ${pattern}
+      OR COALESCE(descripcion, '') ILIKE ${pattern}
+    ORDER BY created_at DESC
+    LIMIT ${safeLimit}
+  `
+}
+
+export async function searchUsers(query: string, limit = 24): Promise<ToonUser[]> {
+  const safeQuery = query.trim()
+
+  if (!safeQuery) {
+    return []
+  }
+
+  const safeLimit = clampLimit(limit, 100)
+  const pattern = `%${safeQuery}%`
+
+  return sql<ToonUser[]>`
+    SELECT
+      id,
+      email,
+      name,
+      username,
+      avatar_url,
+      cover_url,
+      bio,
+      role,
+      artistic_role,
+      location,
+      instagram,
+      tiktok,
+      youtube,
+      verified,
+      verification_status,
+      COALESCE(followers_count, 0)::int AS followers_count,
+      COALESCE(following_count, 0)::int AS following_count,
+      created_at
+    FROM toon.users
+    WHERE name ILIKE ${pattern}
+      OR username ILIKE ${pattern}
+    ORDER BY followers_count DESC, created_at DESC
     LIMIT ${safeLimit}
   `
 }

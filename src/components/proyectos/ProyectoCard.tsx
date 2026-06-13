@@ -14,12 +14,13 @@ export interface ProyectoResumen {
   creador: string
   descripcion: string
   estado: ProyectoEstado
-  miembros: number
-  portada: string
-  ramaId: RamaId
+  colaboradores: number
+  portada_url: string | null
+  ramaId?: RamaId | null
   progreso: number
   favorito: boolean
   ultimaActividad: string
+  created_at: string
 }
 
 interface ProyectoCardProps {
@@ -34,10 +35,11 @@ const estadoLabel: Record<ProyectoEstado, string> = {
 }
 
 export default function ProyectoCard({ proyecto, index = 0, onToggleFavorito }: ProyectoCardProps) {
-  const rama = getRama(proyecto.ramaId)
+  const rama = proyecto.ramaId ? getRama(proyecto.ramaId) : undefined
   const color = rama?.color ?? '#FF6B00'
   const colorOscuro = variarColor(color, -0.26)
   const estadoColor = proyecto.estado === 'terminado' ? '#3CA55C' : color
+  const portada = proyecto.portada_url?.trim() || '/hf/studio.webp'
 
   const badgeStyle: CSSProperties = {
     background: `linear-gradient(135deg, ${color}, ${colorOscuro})`,
@@ -56,7 +58,7 @@ export default function ProyectoCard({ proyecto, index = 0, onToggleFavorito }: 
     >
       <div className="relative h-40 overflow-hidden">
         <Image
-          src={proyecto.portada}
+          src={portada}
           alt={proyecto.nombre}
           fill
           sizes="(max-width: 430px) 100vw, 430px"
@@ -116,7 +118,7 @@ export default function ProyectoCard({ proyecto, index = 0, onToggleFavorito }: 
 
           <div className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[var(--c-surface2)] px-2.5 py-1.5 text-xs font-bold text-[var(--c-text)]">
             <Users size={14} />
-            {proyecto.miembros}
+            {proyecto.colaboradores}
           </div>
         </div>
 

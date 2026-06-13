@@ -21,6 +21,7 @@ interface TareaCardProps {
   tarea: TareaStudio
   completada: boolean
   index?: number
+  procesando?: boolean
   onToggle: (id: string) => void
 }
 
@@ -30,10 +31,11 @@ const prioridadLabel: Record<TareaPrioridad, string> = {
   baja: 'Baja',
 }
 
-export default function TareaCard({ tarea, completada, index = 0, onToggle }: TareaCardProps) {
+export default function TareaCard({ tarea, completada, index = 0, procesando = false, onToggle }: TareaCardProps) {
   const rama = getRama(tarea.ramaId)
   const color = rama?.color ?? '#FF6B00'
   const accentSoft = variarColor(color, -0.22)
+  const interactionDisabled = completada || procesando
 
   const cardStyle: CSSProperties = {
     background: completada
@@ -62,10 +64,11 @@ export default function TareaCard({ tarea, completada, index = 0, onToggle }: Ta
           type="button"
           role="checkbox"
           aria-checked={completada}
-          aria-label={completada ? `Marcar ${tarea.titulo} como pendiente` : `Completar ${tarea.titulo}`}
+          aria-label={completada ? `${tarea.titulo} completada` : `Completar ${tarea.titulo}`}
+          disabled={interactionDisabled}
           onClick={() => onToggle(tarea.id)}
-          whileTap={{ scale: 0.88 }}
-          className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border"
+          whileTap={interactionDisabled ? undefined : { scale: 0.88 }}
+          className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border disabled:cursor-not-allowed"
           style={checkStyle}
         >
           <AnimatePresence initial={false} mode="wait">
