@@ -1,8 +1,12 @@
-export interface MessageNotification {
+export type MessageChatKind = 'direct' | 'group'
+
+export interface MessageChat {
   id: string
-  user_id: string
-  tipo: string
-  mensaje: string
-  leida: boolean
-  created_at: string
+  kind: MessageChatKind
+  name: string
+  avatarUrl: string | null
+  lastMessage: string
+  lastMessageAt: string
+  unreadCount: number
+  memberCount: number
 }

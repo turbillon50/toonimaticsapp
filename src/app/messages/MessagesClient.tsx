@@ -1,354 +1,265 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, Check, CheckCircle2, Circle, Inbox, Loader2, RefreshCw } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 
-import { useApp } from '@/lib/context'
-import type { MessageNotification } from './types'
+import type { MessageChat } from './types'
 
-type NotificationFilter = 'todas' | 'pendientes'
+type ChatFilter = 'todos' | 'no-leidos' | 'grupos'
 
 interface MessagesClientProps {
-  initialNotifications: MessageNotification[]
+  initialChats: MessageChat[]
   isAuthenticated: boolean
 }
 
-interface NotificationsResponse {
-  notificaciones: MessageNotification[]
-}
+const FILTERS: Array<{ id: ChatFilter; label: string }> = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'no-leidos', label: 'No leidos' },
+  { id: 'grupos', label: 'Grupos' },
+]
 
-interface PatchResponse {
-  notificacion: MessageNotification
-}
+export default function MessagesClient({ initialChats, isAuthenticated }: MessagesClientProps) {
+  const [query, setQuery] = useState('')
+  const [activeFilter, setActiveFilter] = useState<ChatFilter>('todos')
+  const normalizedQuery = normalizeText(query)
 
-const TIPO_LABELS_ES: Record<string, string> = {
-  mensaje: 'Mensaje',
-  proyecto: 'Proyecto',
-  tarea: 'Tarea',
-  puntos: 'Puntos',
-  sistema: 'Sistema',
-  verificacion: 'Verificacion',
-}
-
-const TIPO_LABELS_EN: Record<string, string> = {
-  mensaje: 'Message',
-  proyecto: 'Project',
-  tarea: 'Task',
-  puntos: 'Points',
-  sistema: 'System',
-  verificacion: 'Verification',
-}
-
-export default function MessagesClient({ initialNotifications, isAuthenticated }: MessagesClientProps) {
-  const { lang } = useApp()
-  const [notifications, setNotifications] = useState<MessageNotification[]>(initialNotifications)
-  const [filter, setFilter] = useState<NotificationFilter>('todas')
-  const [pendingId, setPendingId] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const unreadCount = useMemo(
-    () => notifications.filter((notification) => !notification.leida).length,
-    [notifications],
+  const unreadChats = useMemo(
+    () => initialChats.filter((chat) => chat.unreadCount > 0).length,
+    [initialChats],
   )
-  const visibleNotifications = useMemo(
-    () => (
-      filter === 'pendientes'
-        ? notifications.filter((notification) => !notification.leida)
-        : notifications
-    ),
-    [filter, notifications],
+  const groupChats = useMemo(
+    () => initialChats.filter((chat) => chat.kind === 'group').length,
+    [initialChats],
   )
-  const copy = getCopy(lang)
+  const filteredChats = useMemo(() => {
+    return initialChats.filter((chat) => {
+      const matchesFilter =
+        activeFilter === 'todos' ||
+        (activeFilter === 'no-leidos' && chat.unreadCount > 0) ||
+        (activeFilter === 'grupos' && chat.kind === 'group')
+      const searchable = `${chat.name} ${chat.lastMessage}`
+      const matchesQuery = !normalizedQuery || normalizeText(searchable).includes(normalizedQuery)
 
-  async function refreshNotifications() {
-    setIsRefreshing(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/notificaciones', { cache: 'no-store' })
-      const data = (await response.json()) as unknown
-
-      if (!response.ok || !isNotificationsResponse(data)) {
-        throw new Error('refresh_failed')
-      }
-
-      setNotifications(data.notificaciones)
-    } catch {
-      setError(copy.refreshError)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
-  async function markAsRead(id: string) {
-    setPendingId(id)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/notificaciones', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-      const data = (await response.json()) as unknown
-
-      if (!response.ok || !isPatchResponse(data)) {
-        throw new Error('patch_failed')
-      }
-
-      setNotifications((current) =>
-        current.map((notification) => (
-          notification.id === data.notificacion.id ? data.notificacion : notification
-        )),
-      )
-    } catch {
-      setError(copy.markError)
-    } finally {
-      setPendingId(null)
-    }
-  }
+      return matchesFilter && matchesQuery
+    })
+  }, [activeFilter, initialChats, normalizedQuery])
 
   return (
-    <div className="px-3 py-3">
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-        className="rounded-2xl border p-4"
-        style={{
-          background: 'linear-gradient(135deg, rgba(17,17,17,0.98), rgba(26,26,26,0.84))',
-          borderColor: 'var(--c-border)',
-        }}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              {copy.kicker}
-            </p>
-            <h1 className="mt-1 text-2xl font-black leading-tight text-[var(--c-text)]">
-              {copy.title}
-            </h1>
-            <p className="mt-1 text-xs leading-relaxed text-[var(--c-muted)]">
-              {copy.subtitle}
-            </p>
-          </div>
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl toon-gradient-bg text-white">
-            <Bell size={21} aria-hidden="true" />
-          </div>
-        </div>
+    <div className="safe-top mx-auto flex min-h-full w-full max-w-3xl flex-col px-3 pb-5 text-[var(--c-text)] sm:px-4">
+      <section aria-label="Buscar conversaciones" className="space-y-3">
+        <label className="relative block">
+          <span className="sr-only">Buscar conversaciones</span>
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--c-muted)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar conversaciones"
+            className="h-12 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] pl-10 pr-3 text-sm font-semibold text-[var(--c-text)] outline-none transition-colors placeholder:text-[var(--c-muted)] focus:border-[var(--toon-orange)]"
+          />
+        </label>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <SummaryMetric label={copy.total} value={notifications.length.toString()} />
-          <SummaryMetric label={copy.unread} value={unreadCount.toString()} />
-        </div>
-      </motion.section>
-
-      <section className="mt-4 flex items-center gap-2">
-        <div className="grid flex-1 grid-cols-2 gap-2">
-          {(['todas', 'pendientes'] as NotificationFilter[]).map((item) => {
-            const active = filter === item
+        <div
+          className="grid grid-cols-3 gap-1 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1"
+          role="tablist"
+          aria-label="Filtros de mensajes"
+        >
+          {FILTERS.map((filter) => {
+            const isActive = activeFilter === filter.id
+            const count = getFilterCount(filter.id, initialChats.length, unreadChats, groupChats)
 
             return (
-              <motion.button
-                key={item}
+              <button
+                key={filter.id}
                 type="button"
-                aria-pressed={active}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setFilter(item)}
-                className={`h-10 rounded-xl px-3 text-xs font-black transition-colors ${
-                  active ? 'toon-gradient-bg text-white' : 'bg-[var(--c-surface2)] text-[var(--c-muted)]'
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveFilter(filter.id)}
+                className={`relative h-10 overflow-hidden rounded-md px-2 text-xs font-black transition-colors ${
+                  isActive ? 'text-white' : 'text-[var(--c-muted)]'
                 }`}
               >
-                {item === 'todas' ? copy.all : copy.pending}
-              </motion.button>
+                {isActive ? (
+                  <motion.span
+                    layoutId="messages-filter"
+                    className="absolute inset-0 rounded-md toon-gradient-bg"
+                    transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                ) : null}
+                <span className="relative z-10 inline-flex max-w-full items-center justify-center gap-1.5">
+                  <span className="truncate">{filter.label}</span>
+                  <span className="rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] leading-none">
+                    {count}
+                  </span>
+                </span>
+              </button>
             )
           })}
         </div>
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.92 }}
-          onClick={refreshNotifications}
-          disabled={isRefreshing || !isAuthenticated}
-          aria-label={copy.refresh}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border bg-[var(--c-surface2)] text-[var(--c-text)] disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ borderColor: 'var(--c-border)' }}
-        >
-          {isRefreshing ? (
-            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw size={16} aria-hidden="true" />
-          )}
-        </motion.button>
       </section>
 
-      {error ? (
-        <p className="mt-3 rounded-xl border border-[#FF6B00]/25 bg-[#FF6B00]/10 px-3 py-2 text-xs font-semibold text-[#FFB070]">
-          {error}
-        </p>
-      ) : null}
-
-      <section className="mt-4 pb-5">
+      <section className="mt-4 flex-1" aria-live="polite">
         {!isAuthenticated ? (
           <EmptyState
-            title={copy.signedOutTitle}
-            description={copy.signedOutDescription}
-            actionLabel={copy.signIn}
+            title="Sesion requerida"
+            description="Inicia sesion para ver tus conversaciones."
             actionHref="/auth/signin"
+            actionLabel="Iniciar sesion"
           />
-        ) : notifications.length === 0 ? (
-          <EmptyState title={copy.emptyTitle} description={copy.emptyDescription} />
-        ) : visibleNotifications.length === 0 ? (
-          <EmptyState title={copy.noPendingTitle} description={copy.noPendingDescription} compact />
+        ) : initialChats.length === 0 ? (
+          <EmptyState
+            title="Sin conversaciones"
+            description="Tus chats de proyectos y colaboradores apareceran aqui."
+          />
+        ) : filteredChats.length === 0 ? (
+          <EmptyState
+            title="Sin resultados"
+            description="No hay conversaciones con ese filtro."
+          />
         ) : (
-          <motion.div layout className="space-y-2">
+          <motion.ul layout className="space-y-2">
             <AnimatePresence initial={false}>
-              {visibleNotifications.map((notification, index) => (
-                <NotificationCard
-                  key={notification.id}
-                  notification={notification}
-                  index={index}
-                  lang={lang}
-                  isPending={pendingId === notification.id}
-                  onMarkRead={markAsRead}
-                />
+              {filteredChats.map((chat, index) => (
+                <ConversationRow key={`${chat.kind}-${chat.id}`} chat={chat} index={index} />
               ))}
             </AnimatePresence>
-          </motion.div>
+          </motion.ul>
         )}
       </section>
     </div>
   )
 }
 
-function SummaryMetric({ label, value }: { label: string; value: string }) {
+function ConversationRow({ chat, index }: { chat: MessageChat; index: number }) {
+  const unread = chat.unreadCount > 0
+
   return (
-    <div className="rounded-xl border bg-black/20 p-3" style={{ borderColor: 'var(--c-border)' }}>
-      <p className="text-xl font-black text-[var(--c-text)]">{value}</p>
-      <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--c-muted)]">
-        {label}
-      </p>
-    </div>
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 10, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.99 }}
+      transition={{ duration: 0.25, delay: index * 0.025, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <Link
+        href={`/messages/${encodeURIComponent(chat.id)}`}
+        aria-label={`Abrir conversacion ${chat.name}`}
+        className={`flex min-h-[76px] items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+          unread
+            ? 'border-[#1FD77A]/50 bg-[#112118]'
+            : 'border-[var(--c-border)] bg-[var(--c-surface)] hover:border-[var(--c-subtle)]'
+        }`}
+      >
+        <ConversationAvatar chat={chat} />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className={`truncate text-sm leading-tight ${unread ? 'font-black' : 'font-bold'}`}>
+                {chat.name}
+              </h2>
+              <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] font-semibold leading-snug text-[var(--c-muted)]">
+                <CheckIcon
+                  className={`h-3.5 w-3.5 flex-shrink-0 ${unread ? 'text-[#1FD77A]' : 'text-[var(--c-subtle)]'}`}
+                />
+                <span className={`truncate ${unread ? 'text-[var(--c-text)]' : ''}`}>
+                  {chat.lastMessage}
+                </span>
+              </p>
+            </div>
+
+            <div className="flex flex-shrink-0 flex-col items-end gap-1">
+              <time
+                dateTime={chat.lastMessageAt}
+                className={`text-[10px] font-bold ${unread ? 'text-[#1FD77A]' : 'text-[var(--c-muted)]'}`}
+              >
+                {formatChatTime(chat.lastMessageAt)}
+              </time>
+              {unread ? (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1FD77A] px-1.5 text-[10px] font-black leading-none text-black">
+                  {formatUnreadCount(chat.unreadCount)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-2 flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-normal text-[var(--c-muted)]">
+            {chat.kind === 'group' ? (
+              <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-black/20 px-2 py-1">
+                <GroupIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">{formatMembers(chat.memberCount)}</span>
+              </span>
+            ) : (
+              <span className="rounded-md bg-black/20 px-2 py-1">Chat</span>
+            )}
+          </div>
+        </div>
+      </Link>
+    </motion.li>
   )
 }
 
-function NotificationCard({
-  notification,
-  index,
-  lang,
-  isPending,
-  onMarkRead,
-}: {
-  notification: MessageNotification
-  index: number
-  lang: 'es' | 'en'
-  isPending: boolean
-  onMarkRead: (id: string) => void
-}) {
-  const copy = getCopy(lang)
-  const unread = !notification.leida
+function ConversationAvatar({ chat }: { chat: MessageChat }) {
+  const [failed, setFailed] = useState(false)
+  const src = chat.avatarUrl?.trim()
 
   return (
-    <motion.article
-      layout
-      initial={{ opacity: 0, x: -10, scale: 0.98 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 12, scale: 0.98 }}
-      transition={{ duration: 0.26, delay: index * 0.03, ease: [0.22, 1, 0.36, 1] }}
-      className={`rounded-2xl border p-3 ${
-        unread ? 'bg-[var(--c-surface)]' : 'bg-[var(--c-surface2)]/70'
-      }`}
-      style={{ borderColor: unread ? 'rgba(255,107,0,0.34)' : 'var(--c-border)' }}
-    >
-      <div className="flex gap-3">
-        <div
-          className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${
-            unread ? 'toon-gradient-bg text-white' : 'bg-[var(--c-surface)] text-[var(--c-muted)]'
-          }`}
-        >
-          {unread ? <Bell size={18} aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />}
+    <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-surface2)]">
+      {src && !failed ? (
+        <Image
+          src={src}
+          alt=""
+          fill
+          sizes="48px"
+          unoptimized
+          className="object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center toon-gradient-bg text-sm font-black text-white">
+          {chat.kind === 'group' ? <GroupIcon className="h-5 w-5" /> : getInitials(chat.name)}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate rounded-full bg-black/20 px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--c-muted)]">
-              {getTipoLabel(notification.tipo, lang)}
-            </span>
-            <time className="flex-shrink-0 text-[10px] font-medium text-[var(--c-muted)]" dateTime={notification.created_at}>
-              {formatDate(notification.created_at, lang)}
-            </time>
-          </div>
-
-          <p className="mt-2 text-sm font-semibold leading-snug text-[var(--c-text)]">
-            {notification.mensaje}
-          </p>
-
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--c-muted)]">
-              {unread ? (
-                <Circle size={8} fill="currentColor" aria-hidden="true" />
-              ) : (
-                <CheckCircle2 size={12} aria-hidden="true" />
-              )}
-              {unread ? copy.unreadStatus : copy.readStatus}
-            </span>
-            {unread ? (
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onMarkRead(notification.id)}
-                disabled={isPending}
-                className="flex h-8 items-center gap-1.5 rounded-lg bg-white/10 px-2.5 text-[11px] font-black text-[var(--c-text)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isPending ? (
-                  <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <Check size={13} aria-hidden="true" />
-                )}
-                <span>{copy.markRead}</span>
-              </motion.button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </motion.article>
+      )}
+      {chat.kind === 'group' ? (
+        <span className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-tl-md bg-black/80 text-white">
+          <GroupIcon className="h-3.5 w-3.5" />
+        </span>
+      ) : null}
+    </div>
   )
 }
 
 function EmptyState({
   title,
   description,
-  actionLabel,
   actionHref,
-  compact = false,
+  actionLabel,
 }: {
   title: string
   description: string
-  actionLabel?: string
   actionHref?: string
-  compact?: boolean
+  actionLabel?: string
 }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28 }}
-      className={`rounded-2xl border bg-[var(--c-surface)] px-5 text-center ${
-        compact ? 'py-8' : 'py-12'
-      }`}
-      style={{ borderColor: 'var(--c-border)' }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-10 text-center"
     >
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--c-surface2)] text-[var(--c-muted)]">
-        <Inbox size={24} aria-hidden="true" />
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--c-surface2)] text-[var(--c-muted)]">
+        <GroupIcon className="h-6 w-6" />
       </div>
-      <h2 className="mt-4 text-lg font-black text-[var(--c-text)]">{title}</h2>
+      <h2 className="mt-4 text-base font-black text-[var(--c-text)]">{title}</h2>
       <p className="mx-auto mt-2 max-w-[280px] text-sm leading-relaxed text-[var(--c-muted)]">
         {description}
       </p>
-      {actionLabel && actionHref ? (
+      {actionHref && actionLabel ? (
         <Link
           href={actionHref}
-          className="mt-5 inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-black toon-gradient-bg text-white"
+          className="mt-5 inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-black toon-gradient-bg text-white"
         >
           {actionLabel}
         </Link>
@@ -357,105 +268,128 @@ function EmptyState({
   )
 }
 
-function getTipoLabel(tipo: string, lang: 'es' | 'en'): string {
-  const labels = lang === 'es' ? TIPO_LABELS_ES : TIPO_LABELS_EN
-  const normalized = tipo.trim().toLowerCase()
+function getFilterCount(filter: ChatFilter, total: number, unread: number, groups: number): number {
+  if (filter === 'no-leidos') {
+    return unread
+  }
 
-  return labels[normalized] ?? toTitleCase(normalized.replace(/[-_]+/g, ' '))
+  if (filter === 'grupos') {
+    return groups
+  }
+
+  return total
 }
 
-function toTitleCase(value: string): string {
+function normalizeText(value: string): string {
   return value
-    .split(' ')
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
 }
 
-function formatDate(value: string, lang: 'es' | 'en'): string {
-  return new Intl.DateTimeFormat(lang === 'es' ? 'es-MX' : 'en-US', {
+function formatChatTime(value: string): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const now = new Date()
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+
+  if (sameDay) {
+    return new Intl.DateTimeFormat('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  }
+
+  if (date.getFullYear() === now.getFullYear()) {
+    return new Intl.DateTimeFormat('es-CO', {
+      day: '2-digit',
+      month: 'short',
+    }).format(date)
+  }
+
+  return new Intl.DateTimeFormat('es-CO', {
     day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  }).format(new Date(value))
+    month: '2-digit',
+    year: '2-digit',
+  }).format(date)
 }
 
-function getCopy(lang: 'es' | 'en') {
-  if (lang === 'en') {
-    return {
-      kicker: 'Notifications',
-      title: 'Community inbox',
-      subtitle: 'Updates from projects, studio tasks, messages, and account activity.',
-      total: 'Total',
-      unread: 'Unread',
-      all: 'All',
-      pending: 'Unread',
-      refresh: 'Refresh notifications',
-      refreshError: 'Notifications could not be refreshed.',
-      markError: 'The notification could not be marked as read.',
-      signedOutTitle: 'Sign in required',
-      signedOutDescription: 'Your community notifications are available after signing in.',
-      signIn: 'Sign in',
-      emptyTitle: 'No notifications yet',
-      emptyDescription: 'When the community interacts with your work, updates will appear here.',
-      noPendingTitle: 'No unread notifications',
-      noPendingDescription: 'Everything in this inbox is already up to date.',
-      unreadStatus: 'Unread',
-      readStatus: 'Read',
-      markRead: 'Mark read',
-    }
-  }
-
-  return {
-    kicker: 'Notificaciones',
-    title: 'Bandeja comunitaria',
-    subtitle: 'Avisos de proyectos, tareas de studio, mensajes y actividad de cuenta.',
-    total: 'Total',
-    unread: 'Sin leer',
-    all: 'Todas',
-    pending: 'Sin leer',
-    refresh: 'Actualizar notificaciones',
-    refreshError: 'No se pudieron actualizar las notificaciones.',
-    markError: 'No se pudo marcar la notificacion como leida.',
-    signedOutTitle: 'Sesion requerida',
-    signedOutDescription: 'Tus notificaciones de comunidad estaran disponibles al iniciar sesion.',
-    signIn: 'Iniciar sesion',
-    emptyTitle: 'Sin notificaciones por ahora',
-    emptyDescription: 'Cuando la comunidad interactue con tu obra, los avisos apareceran aqui.',
-    noPendingTitle: 'No hay pendientes',
-    noPendingDescription: 'Todas las notificaciones de esta bandeja ya estan al dia.',
-    unreadStatus: 'Sin leer',
-    readStatus: 'Leida',
-    markRead: 'Marcar leida',
-  }
+function formatUnreadCount(count: number): string {
+  return count > 99 ? '99+' : count.toString()
 }
 
-function isNotificationsResponse(value: unknown): value is NotificationsResponse {
+function formatMembers(count: number): string {
+  return count === 1 ? '1 miembro' : `${count} miembros`
+}
+
+function getInitials(name: string): string {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+
+  return initials || 'TM'
+}
+
+function SearchIcon({ className }: { className?: string }) {
   return (
-    isRecord(value) &&
-    Array.isArray(value.notificaciones) &&
-    value.notificaciones.every(isMessageNotification)
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   )
 }
 
-function isPatchResponse(value: unknown): value is PatchResponse {
-  return isRecord(value) && isMessageNotification(value.notificacion)
-}
-
-function isMessageNotification(value: unknown): value is MessageNotification {
+function GroupIcon({ className }: { className?: string }) {
   return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.user_id === 'string' &&
-    typeof value.tipo === 'string' &&
-    typeof value.mensaje === 'string' &&
-    typeof value.leida === 'boolean' &&
-    typeof value.created_at === 'string'
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M9.5 11.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M3.75 19.25c.55-3.1 2.55-5.1 5.75-5.1s5.2 2 5.75 5.1"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.25 11.25a2.75 2.75 0 1 0 0-5.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.5 14.35c2.15.42 3.55 2.05 3.95 4.4"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 12.5l4.2 4.2L19 6.9"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
 }
